@@ -1,0 +1,95 @@
+---
+title: "Structural modeling"
+author: "Guilhem Huau"
+date: "`r format(Sys.time(), '%d/%m/%Y %H:%M:%S')`"
+colorlinks: true
+output:
+  html_document:
+    toc: true
+    toc_depth: 4
+    toc_float: true
+    number_sections: TRUE
+  pdf_document:
+    toc: true
+    toc_depth: 4
+    number_sections: TRUE
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      eval = TRUE,
+                      include = TRUE,
+                      warning = TRUE,
+                      message = TRUE,
+                      
+                      cache = FALSE, # save chunks output 
+                      
+                      results = "hold", # display chunk output in one block
+                      
+                      tidy = FALSE, # better code organisation
+                      tidy.opts = list(width.cutoff = 80),
+                      strip.white = TRUE, #remove the white lines in the beginning or end of a source chunk
+                      
+                      fig.align = "center",
+                      fig.width = 9,
+                      fig.height = 5)
+
+knitr::opts_knit$set(progress = TRUE,
+                     verbose = FALSE,
+                     width = 80)
+
+```
+
+```{css echo=FALSE, eval = TRUE}
+/* add some CSS styling here */
+```
+
+**Packages / R-options:**
+```{r pkgs_options}
+suppressPackageStartupMessages({
+  require(dplyr)
+  require(tidyr)
+  require(magrittr)
+  require(lavaan)
+  
+})
+
+#  R options
+options(stringsAsFactors = FALSE)
+
+```
+
+
+```{r loading_data}
+dat_root = read.csv("E:/SoyBeanData/Phenotype/2017/2017_Tottori_May_RootPhenotype.csv")
+dat_shoot = read.csv("E:/SoyBeanData/Phenotype/2017/2017_Tottori_May_ShootPhenotype.csv")
+dat_shoot$year = 2017
+dat_join = inner_join(dat_shoot, dat_root, by = colnames(dat_root)[1:9])
+dat_join$ID = 1:nrow(dat_join)
+
+weightProblem = filter(dat_join,LeafWeight_g > TotalWeight_g)
+dat_join = anti_join(dat_join, weightProblem)
+
+dat_join_C = filter(dat_join, block == 'C')
+a = c(1:5,7:9)
+dat_join_D = setdiff(dat_join, dat_join_C)[,-(a)]
+dat_join_C = dat_join_C[,-(a)]
+nam = names(dat_join_C)
+dat_join_C_merged_mean = group_by(dat_join_C,variety)%>%
+  summarise_at(nam[-c(1)], mean, na.rm = TRUE)
+dat_join_D_merged_mean = group_by(dat_join_D,variety)%>%
+  summarise_at(nam[-c(1)], mean, na.rm = TRUE)
+dat_join_merged = inner_join(dat_join_C_merged_mean, dat_join_D_merged_mean, by = 'variety', suffix = c(".C", ".D"))
+dat_join_merged$variety = as.factor(dat_join_merged$variety)
+```
+
+
+
+
+
+
+
+# Appendix
+```{r sessionInfo}
+print(sessionInfo(), locale = FALSE)
+```
