@@ -48,6 +48,7 @@ knitr::opts_knit$set(progress = TRUE,
 ```{r pkgs_options}
 suppressPackageStartupMessages({
   require(dplyr)
+  require(tibble)
   require(tidyr)
   require(magrittr)
   require(lavaan)
@@ -71,21 +72,47 @@ weightProblem = filter(dat_join,LeafWeight_g > TotalWeight_g)
 dat_join = anti_join(dat_join, weightProblem)
 
 dat_join_C = filter(dat_join, block == 'C')
-a = c(1:5,7:9)
-dat_join_D = setdiff(dat_join, dat_join_C)[,-(a)]
-dat_join_C = dat_join_C[,-(a)]
+dat_join_C = dat_join_C[,-(c(1:5,7:9))]
 nam = names(dat_join_C)
-dat_join_C_merged_mean = group_by(dat_join_C,variety)%>%
+dat_join_C_mean = group_by(dat_join_C,variety)%>%
   summarise_at(nam[-c(1)], mean, na.rm = TRUE)
-dat_join_D_merged_mean = group_by(dat_join_D,variety)%>%
-  summarise_at(nam[-c(1)], mean, na.rm = TRUE)
-dat_join_merged = inner_join(dat_join_C_merged_mean, dat_join_D_merged_mean, by = 'variety', suffix = c(".C", ".D"))
-dat_join_merged$variety = as.factor(dat_join_merged$variety)
+dat_join_C_mean$variety = as.factor(dat_join_C_mean$variety)
+dat_join_C_mean = column_to_rownames(dat_join_C_mean, var = "variety")
+dat_scaled = mutate_if(dat_join_C_mean, is.numeric, scale)
+dat_scaled = dat_scaled[complete.cases(dat_scaled),]
 ```
 
+```{r model}
+dat_M1 = dat_scaled[,c(2:4,8)]
+names(dat_M1) = c("LeafWeight","TotalWeight","TRL","NumTips")
+dat_M1 = mutate(dat_M1, ShootWeight = TotalWeight - LeafWeight)
+
+dat_M2 = dat_scaled[,c(1:4,7,8,11)]
+names(dat_M2) = c("PlantHeight","LeafWeight","TotalWeight","TRL","AvgDiam","NumTips","LRD1")
 
 
 
+m1 = 'TotalWeight ~ root + shoot
+      root =~ TRL + NumTips
+      shoot =~ LeafWeight + ShootWeight'
+
+m2 = 'TotalWeight ~ root + shoot
+      root =~ elongation + ramification
+      shoot =~ PlantHeight + leaves_surface
+      elongation =~ LRD1 + TRL
+      ramification =~ NumTips + AvgDiam
+      leaves_surface =~ LeafWeight'
+
+dat_test = select(dat_M2, TRL, NumTips,LeafWeight, PlantHeight)
+mtest = 'root =~ TRL + NumTips
+        shoot =~ LeafWeight + PlantHeight'
+
+
+fit1 = cfa(model = m1, data = dat_M1)
+fit2 = cfa(model = m2, data = dat_M2)
+fit_test = cfa(model = mtest, data = dat_test)
+
+```
 
 
 
