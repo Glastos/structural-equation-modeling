@@ -52,7 +52,6 @@ suppressPackageStartupMessages({
   require(tidyr)
   require(magrittr)
   require(lavaan)
-  
 })
 
 #  R options
@@ -71,13 +70,10 @@ dat_join$ID = 1:nrow(dat_join)
 weightProblem = filter(dat_join,LeafWeight_g > TotalWeight_g)
 dat_join = anti_join(dat_join, weightProblem)
 
-dat_join_C = filter(dat_join, block == 'C')
-dat_join_C = dat_join_C[,-(c(1:5,7:9))]
-nam = names(dat_join_C)
-dat_join_C_mean = group_by(dat_join_C,variety)
-dat_join_C_mean$variety = as.factor(dat_join_C_mean$variety)
-dat_scaled = mutate_if(dat_join_C_mean, is.numeric, scale)
-dat_scaled = dat_scaled[,-1]
+dat_join = dat_join[,-(c(1:6,8,9))]
+nam = names(dat_join)
+dat_scaled = mutate_if(dat_join, is.numeric, scale)
+dat_scaled = dat_scaled[complete.cases(dat_scaled),]
 ```
 
 ```{r model}
