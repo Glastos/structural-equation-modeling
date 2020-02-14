@@ -78,19 +78,19 @@ dat_scaled = dat_join[complete.cases(dat_join),]
 
 ```{r model}
 
-dat_test = dat_scaled[,c(1:5,8)]
-names(dat_test) = c("block", "PlantHeight","LeafWeight","TotalWeight","TRL","NumTips")
-dat_test = filter(dat_test, block == "C")
+dat_choose = dat_scaled[,c(1:5,9)]
+names(dat_choose) = c("block", "PlantHeight","LeafWeight","TotalWeight","TRL","NumTips")
+# dat_test = filter(dat_test, block == "D")
 
 
-dat_test = mutate_if(dat_test, is.numeric, scale)
+dat_test = mutate_if(dat_choose, is.numeric, scale)
 
 mtest = 'root =~ TRL + NumTips
         shoot =~ LeafWeight + PlantHeight + TotalWeight
         root ~ shoot
         TotalWeight ~~ LeafWeight + PlantHeight'
 
-fit_test = cfa(model = mtest, data = dat_test)
+fit_test = cfa(model = mtest, data = dat_test, group = "block")
 
 summary(fit_test, standardized=TRUE)
 
