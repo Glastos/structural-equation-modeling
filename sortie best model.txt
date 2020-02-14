@@ -1,0 +1,123 @@
+> mtest = 'root =~ TRL + NumTips
++         shoot =~ LeafWeight + PlantHeight + TotalWeight
++         root ~ shoot
++         TotalWeight ~~ LeafWeight + PlantHeight'
+> 
+> fit_test = cfa(model = mtest, data = dat_test, group = "block")
+> 
+> summary(fit_test, standardized=TRUE)
+
+lavaan 0.6-5 ended normally after 54 iterations
+
+  Estimator                                         ML
+  Optimization method                           NLMINB
+  Number of free parameters                         36
+                                                      
+  Number of observations per group:                   
+    C                                              527
+    D                                              509
+                                                      
+Model Test User Model:
+                                                      
+  Test statistic                                 7.279
+  Degrees of freedom                                 4
+  P-value (Chi-square)                           0.122
+  Test statistic for each group:
+    C                                            7.257
+    D                                            0.022
+
+Parameter Estimates:
+
+  Information                                 Expected
+  Information saturated (h1) model          Structured
+  Standard errors                             Standard
+
+
+Group 1 [C]:
+
+Latent Variables:
+                   Estimate  Std.Err  z-value  P(>|z|)   Std.lv  Std.all
+  root =~                                                               
+    TRL               1.000                               1.032    0.998
+    NumTips           0.877    0.025   35.077    0.000    0.905    0.908
+  shoot =~                                                              
+    LeafWeight        1.000                               0.849    0.746
+    PlantHeight       0.921    0.062   14.801    0.000    0.781    0.765
+    TotalWeight       1.113    0.032   34.883    0.000    0.945    0.861
+
+Regressions:
+                   Estimate  Std.Err  z-value  P(>|z|)   Std.lv  Std.all
+  root ~                                                                
+    shoot             0.964    0.065   14.869    0.000    0.793    0.793
+
+Covariances:
+                   Estimate  Std.Err  z-value  P(>|z|)   Std.lv  Std.all
+ .LeafWeight ~~                                                         
+   .TotalWeight       0.352    0.044    8.032    0.000    0.352    0.829
+ .PlantHeight ~~                                                        
+   .TotalWeight       0.026    0.019    1.373    0.170    0.026    0.072
+
+Intercepts:
+                   Estimate  Std.Err  z-value  P(>|z|)   Std.lv  Std.all
+   .TRL               0.255    0.045    5.659    0.000    0.255    0.246
+   .NumTips           0.206    0.043    4.746    0.000    0.206    0.207
+   .LeafWeight        0.336    0.050    6.775    0.000    0.336    0.295
+   .PlantHeight       0.232    0.044    5.203    0.000    0.232    0.227
+   .TotalWeight       0.334    0.048    6.984    0.000    0.334    0.304
+   .root              0.000                               0.000    0.000
+    shoot             0.000                               0.000    0.000
+
+Variances:
+                   Estimate  Std.Err  z-value  P(>|z|)   Std.lv  Std.all
+   .TRL               0.004    0.021    0.196    0.844    0.004    0.004
+   .NumTips           0.174    0.020    8.879    0.000    0.174    0.176
+   .LeafWeight        0.575    0.052   11.065    0.000    0.575    0.444
+   .PlantHeight       0.432    0.042   10.348    0.000    0.432    0.415
+   .TotalWeight       0.313    0.045    6.918    0.000    0.313    0.260
+   .root              0.396    0.048    8.279    0.000    0.372    0.372
+    shoot             0.721    0.081    8.899    0.000    1.000    1.000
+
+
+Group 2 [D]:
+
+Latent Variables:
+                   Estimate  Std.Err  z-value  P(>|z|)   Std.lv  Std.all
+  root =~                                                               
+    TRL               1.000                               0.886    0.997
+    NumTips           1.014    0.023   43.373    0.000    0.898    0.939
+  shoot =~                                                              
+    LeafWeight        1.000                               0.572    0.849
+    PlantHeight       1.206    0.073   16.458    0.000    0.690    0.753
+    TotalWeight       1.162    0.031   37.408    0.000    0.665    0.897
+
+Regressions:
+                   Estimate  Std.Err  z-value  P(>|z|)   Std.lv  Std.all
+  root ~                                                                
+    shoot             1.215    0.072   16.826    0.000    0.785    0.785
+
+Covariances:
+                   Estimate  Std.Err  z-value  P(>|z|)   Std.lv  Std.all
+ .LeafWeight ~~                                                         
+   .TotalWeight       0.077    0.017    4.454    0.000    0.077    0.664
+ .PlantHeight ~~                                                        
+   .TotalWeight       0.001    0.011    0.112    0.910    0.001    0.006
+
+Intercepts:
+                   Estimate  Std.Err  z-value  P(>|z|)   Std.lv  Std.all
+   .TRL              -0.264    0.039   -6.702    0.000   -0.264   -0.297
+   .NumTips          -0.213    0.042   -5.029    0.000   -0.213   -0.223
+   .LeafWeight       -0.348    0.030  -11.640    0.000   -0.348   -0.516
+   .PlantHeight      -0.240    0.041   -5.899    0.000   -0.240   -0.261
+   .TotalWeight      -0.346    0.033  -10.530    0.000   -0.346   -0.467
+   .root              0.000                               0.000    0.000
+    shoot             0.000                               0.000    0.000
+
+Variances:
+                   Estimate  Std.Err  z-value  P(>|z|)   Std.lv  Std.all
+   .TRL               0.005    0.013    0.396    0.692    0.005    0.006
+   .NumTips           0.109    0.015    7.464    0.000    0.109    0.119
+   .LeafWeight        0.127    0.017    7.601    0.000    0.127    0.279
+   .PlantHeight       0.364    0.031   11.649    0.000    0.364    0.433
+   .TotalWeight       0.107    0.022    4.927    0.000    0.107    0.195
+   .root              0.301    0.031    9.613    0.000    0.383    0.383
+    shoot             0.327    0.031   10.549    0.000    1.000    1.000

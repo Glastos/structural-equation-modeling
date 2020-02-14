@@ -66,27 +66,31 @@ dat_shoot = read.csv("E:/SoyBeanData/Phenotype/2017/2017_Tottori_May_ShootPhenot
 dat_shoot$year = 2017
 dat_join = inner_join(dat_shoot, dat_root, by = colnames(dat_root)[1:9])
 dat_join$ID = 1:nrow(dat_join)
-
+dat_join$block = as.factor(dat_join$block)
 weightProblem = filter(dat_join,LeafWeight_g > TotalWeight_g)
 dat_join = anti_join(dat_join, weightProblem)
 
 dat_join = dat_join[,-(c(1:6,8,9))]
 nam = names(dat_join)
-dat_scaled = mutate_if(dat_join, is.numeric, scale)
-dat_scaled = dat_scaled[complete.cases(dat_scaled),]
+
+dat_scaled = dat_join[complete.cases(dat_join),]
 ```
 
 ```{r model}
 
-dat_test = dat_scaled[,c(1:4,8)]
-names(dat_test) = c("PlantHeight","LeafWeight","TotalWeight","TRL","NumTips")
+dat_test = dat_scaled[,c(1:5,8)]
+names(dat_test) = c("block", "PlantHeight","LeafWeight","TotalWeight","TRL","NumTips")
+dat_test = filter(dat_test, block == "C")
+
+
+dat_test = mutate_if(dat_test, is.numeric, scale)
 
 mtest = 'root =~ TRL + NumTips
         shoot =~ LeafWeight + PlantHeight + TotalWeight
         root ~ shoot
         TotalWeight ~~ LeafWeight + PlantHeight'
 
-fit_test = cfa(model = mtest, data = dat_test, missing = "ml")
+fit_test = cfa(model = mtest, data = dat_test)
 
 summary(fit_test, standardized=TRUE)
 

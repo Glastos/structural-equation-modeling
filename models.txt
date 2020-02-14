@@ -1,0 +1,131 @@
+##Only C data
+## WARNING: some estimated lv variances are negative
+mtest = 'root =~ TRL + NumTips
+        shoot =~ LeafWeight + PlantHeight + TotalWeight
+        root ~ shoot
+        TotalWeight ~~ LeafWeight + PlantHeight'
+Model Test User Model:
+                                                      
+  Test statistic                                17.670
+  Degrees of freedom                                 2
+  P-value (Chi-square)                           0.000
+
+
+##Only C data
+## WARNING: some estimated lv variances are negative
+mtest = 'root =~ TRL + NumTips
+        shoot =~ LeafWeight + PlantHeight + TotalWeight
+        root ~ shoot
+        TotalWeight ~~ LeafWeight'
+Model Test User Model:
+                                                      
+  Test statistic                                19.029
+  Degrees of freedom                                 3
+  P-value (Chi-square)                           0.000
+
+##Only C data
+##lavaan WARNING: some estimated ov variances are negativelavaan WARNING: some estimated lv variances are negative
+mtest = 'root =~ TRL + NumTips
+        shoot =~ LeafWeight + PlantHeight + TotalWeight
+        root ~ shoot
+        TotalWeight ~~ PlantHeight'
+Model Test User Model:
+                                                      
+  Test statistic                                53.025
+  Degrees of freedom                                 3
+  P-value (Chi-square)                           0.000
+
+##Only C data
+##lavaan WARNING: some estimated ov variances are negativelavaan WARNING: some estimated lv variances are negative
+mtest = 'root =~ TRL + NumTips
+        shoot =~ LeafWeight + PlantHeight + TotalWeight
+        root ~ shoot
+        LeafWeight ~~ PlantHeight'
+Model Test User Model:
+                                                      
+  Test statistic                                48.473
+  Degrees of freedom                                 3
+  P-value (Chi-square)                           0.000
+
+
+Adding the root variable to the covariance return error: Could not compute standard errors! The information matrix could not be inverted. This may be a symptom that the model is not identified.lavaan WARNING: some estimated lv variances are negative
+
+With D data and root covariance -> lavaan WARNING:
+    Could not compute standard errors! The information matrix could
+    not be inverted. This may be a symptom that the model is not
+    identified.lavaan WARNING: the covariance matrix of the residuals of the observed
+                variables (theta) is not positive definite;
+                use lavInspect(fit, "theta") to investigate.
+
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+All data | No error
+mtest = 'root =~ TRL + NumTips
+        shoot =~ LeafWeight + PlantHeight + TotalWeight
+        root ~ shoot
+        TotalWeight ~~ LeafWeight + PlantHeight'
+
+lavaan 0.6-5 ended normally after 54 iterations
+
+  Estimator                                         ML
+  Optimization method                           NLMINB
+  Number of free parameters                         36
+                                                      
+  Number of observations per group:                   
+    C                                              527
+    D                                              509
+                                                      
+Model Test User Model:
+                                                      
+  Test statistic                                 7.279
+  Degrees of freedom                                 4
+  P-value (Chi-square)                           0.122
+  Test statistic for each group:
+    C                                            7.257
+    D                                            0.022
+
+
+Work also well with different covariance combinaison
+    Without PlantHeight, p-value = 0.169 and Test statistic = 9.078
+    Without LeafWeight or TotalWeight, p-value = 0 and higher Test statistic -> strange
+
+With the root covariance, p-value = 0.026 but Could not compute standard errors! The information matrix could
+    not be inverted. This may be a symptom that the model is not
+    identified.
+
+
+
+Other model with no error and an existing p-value:
+
+->Adding Root DryWeight variable<-
+
+## WARNING: some estimated ov variances are negative
+Model Test User Model:
+                                                      
+  Test statistic                                15.745
+  Degrees of freedom                                 8
+  P-value (Chi-square)                           0.046
+  Test statistic for each group:
+    C                                            9.670
+    D                                            6.075
+mtest = 'root =~ TRL + NumTips + DryWeight
+        shoot =~ LeafWeight + PlantHeight + TotalWeight
+        root ~ shoot
+        TotalWeight ~~ LeafWeight + PlantHeight
+        TRL ~~ NumTips + DryWeight'
+
+
+## Model Test User Model:
+                                                      
+  Test statistic                                11.086
+  Degrees of freedom                                 8
+  P-value (Chi-square)                           0.197
+  Test statistic for each group:
+    C                                            9.925
+    D                                            1.161
+mtest = 'root =~ TRL + NumTips + DryWeight
+        shoot =~ LeafWeight + PlantHeight + TotalWeight
+        root ~ shoot
+        TotalWeight ~~ LeafWeight + PlantHeight + DryWeight
+        NumTips ~~ TRL '
+
