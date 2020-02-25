@@ -45,13 +45,16 @@ knitr::opts_knit$set(progress = TRUE,
 ```
 
 **Packages / R-options:**
-```{r pkgs_options}
+```{r pkgs_options, message=FALSE, warning=FALSE}
 suppressPackageStartupMessages({
   require(dplyr)
   require(tibble)
   require(tidyr)
   require(magrittr)
   require(lavaan)
+  require(lavaanPlot)
+  require(plotly)
+  require(FactoMineR)
 })
 
 #  R options
@@ -59,10 +62,11 @@ options(stringsAsFactors = FALSE)
 
 ```
 
+***
 
-```{r loading_data}
-dat_root = read.csv("E:/SoyBeanData/Phenotype/2017/2017_Tottori_May_RootPhenotype.csv")
-dat_shoot = read.csv("E:/SoyBeanData/Phenotype/2017/2017_Tottori_May_ShootPhenotype.csv")
+```{r loading_data, include=FALSE}
+dat_root = read.csv("2017_Tottori_May_RootPhenotype.csv")
+dat_shoot = read.csv("2017_Tottori_May_ShootPhenotype.csv")
 dat_shoot$year = 2017
 dat_join = inner_join(dat_shoot, dat_root, by = colnames(dat_root)[1:9])
 dat_join$ID = 1:nrow(dat_join)
@@ -71,14 +75,13 @@ weightProblem = filter(dat_join,LeafWeight_g > TotalWeight_g)
 dat_join = anti_join(dat_join, weightProblem)
 
 dat_join = dat_join[,-(c(1:6,8,9))]
-nam = names(dat_join)
 
-dat_scaled = dat_join[complete.cases(dat_join),]
+dat_complete = dat_join[complete.cases(dat_join),]
 ```
 
-```{r model}
+```{r model, include=FALSE}
 
-dat_choose = dat_scaled[,c(1:5,9)]
+dat_choose = dat_complete[,c(1:5,9)]
 names(dat_choose) = c("block", "PlantHeight","LeafWeight","TotalWeight","TRL","NumTips")
 # dat_test = filter(dat_test, block == "D")
 
@@ -87,16 +90,406 @@ dat_test = mutate_if(dat_choose, is.numeric, scale)
 
 mtest = 'root =~ TRL + NumTips
         shoot =~ LeafWeight + PlantHeight + TotalWeight
-        root ~ shoot
+        shoot ~ root
         TotalWeight ~~ LeafWeight + PlantHeight'
 
 fit_test = cfa(model = mtest, data = dat_test, group = "block")
+```
 
-summary(fit_test, standardized=TRUE)
+# Model
+
+
+
+
+On the figure the arrow and the number on the left stand for the C(ontrol) group, while the ones on the right are the D(rought) group.
+
+```{r model_plot, echo=FALSE}
+labels = list(root = "Root", shoot = "Shoot", TRL = "Total Root Length", NumTips = "Number of Tips", LeafWeight = "Leaf Weight", PlantHeight = "Plant Height", TotalWeight = "Total Weight")
+lavaanPlot(name = "Model", model = fit_test, labels = labels, coefs = TRUE)
 
 ```
 
 
+***
+
+# Fit Summary
+
+
+The first part of this output give various informations about the model and how good it is. After you can read the results for each group.
+
+```{r}
+summary(fit_test, standardized=TRUE)
+```
+
+```{r echo=FALSE}
+lat_data = predict(fit_test, dat_test) #to get the latent values for each individuals
+
+dat_lat1 = lat_data$C
+dat_lat1 = data.frame(block = "C", dat_lat1)
+
+dat_lat2 = lat_data$D
+dat_lat2 = data.frame(block = "D", dat_lat2)
+
+a = bind_rows(dat_lat1, dat_lat2)
+
+dat_ordered = arrange(dat_choose, block)
+b = bind_cols(dat_ordered,a)[,-7]
+
+```
+
+
+
+***
+# General statistics
+
+
+```{r general, echo=FALSE}
+summary(b)
+
+```
+
+***
+
+# Group statistics
+
+***
+
+## Plant Height Statistics
+
+
+```{r plantHeight, echo=FALSE}
+tapply(b[,2], b$block, summary)
+plot_ly(b, x = ~block, y= ~PlantHeight, type = "box")
+```
+
+
+***
+
+## Leaf Weight Statistics
+
+
+```{r LeafWeight, echo=FALSE}
+tapply(b[,3], b$block, summary)
+plot_ly(b, x = ~block, y= ~LeafWeight, type = "box")
+```
+
+
+***
+
+## Total Weight Statistics
+
+
+```{r TotalWeight, echo=FALSE}
+tapply(b[,4], b$block, summary)
+plot_ly(b, x = ~block, y= ~TotalWeight, type = "box")
+```
+
+
+***
+
+## Total Root Length Statistics
+
+
+```{r TRL, echo=FALSE, warning=FALSE}
+tapply(b[,5], b$block, summary)
+plot_ly(b, x = ~block, y= ~TRL, type = "box")
+```
+
+
+***
+
+## Number of Root Tips Statistics
+
+
+```{r NumTips, echo=FALSE}
+tapply(b[,6], b$block, summary)
+plot_ly(b, x = ~block, y= ~NumTips, type = "box")
+```
+
+***
+
+## Shoot (latent variable) Statistics
+
+
+```{r Shoot, echo=FALSE}
+tapply(b[,7], b$block, summary)
+plot_ly(b, x = ~block, y= ~shoot, type = "box")
+```
+
+***
+
+## Root (latent variable) Statistics
+
+
+```{r Root, echo=FALSE}
+tapply(b[,8], b$block, summary)
+plot_ly(b, x = ~block, y= ~root, type = "box")
+```
+
+***
+
+# Root - Shoot Plot
+
+
+Note: Root and shoot are standardized variables.
+
+```{r root_shoot_plot, echo=FALSE, warning=FALSE}
+fit_root_shoot_C = lm(data = filter(b, block == "C"), shoot ~ root)
+fit_root_shoot_D = lm(data = filter(b, block == "D"), shoot ~ root)
+
+x <- list(title = "Root")
+y <- list(title = "Shoot")
+plot_ly(b, x= ~root, y= ~shoot, color = ~block, type = "scatter", mode = "markers") %>%
+  layout(title = "Shoot(Root) and linear regressions for each group", xaxis = x, yaxis = y) %>%
+  add_lines(data = filter(b, block == "C"), y = fitted(fit_root_shoot_C), text = paste("shoot =", round(fit_root_shoot_C$coefficients[2], 3), "* root"), hoverinfo = "text") %>%
+  add_lines(data = filter(b, block == "D"), y = fitted(fit_root_shoot_D), text = paste("shoot =", round(fit_root_shoot_D$coefficients[2], 3), "* root"), hoverinfo = "text")
+
+print(paste("Correlation between fit and value for group C:",round(cor(b$shoot[which(b$block=="C")],fitted(fit_root_shoot_C)),3)))
+print(paste("Correlation between fit and value for group D:",round(cor(b$shoot[which(b$block=="D")],fitted(fit_root_shoot_D)),3)))
+```
+
+(You can click on the legend to choose which layers you want to see)
+
+***
+
+# PCA Analysis
+
+## PCA on Root variables only
+
+When Comp1 and Comp2 (and Comp4 and Comp5) are not both in the model, no error (but still p-value = 0 -> strange)
+
+```{r PCA}
+
+PCA_root = PCA(dat_complete, scale.unit=TRUE, ncp=5, graph=F, quali.sup = 1, quanti.sup = c(2:4))
+PCA_root_coord = PCA_root[["var"]][["coord"]]
+
+dat_PCA_root = data.frame(as.matrix.data.frame(dat_complete[,-c(1:4)]) %*% as.matrix.data.frame(PCA_root_coord))
+dat_PCA_with_block = data.frame(dat_complete[,c(1:4)], dat_PCA_root)
+dat_fit_PCA = mutate_if(dat_PCA_with_block, is.numeric, scale)
+
+names(dat_fit_PCA) = c("block","PlantHeight","LeafWeight","TotalWeight","CompR1","CompR2","CompR3","CompR4","CompR5")
+
+mPCA = 'root =~ CompR1 + CompR2
+        shoot =~ LeafWeight + PlantHeight + TotalWeight
+        shoot ~ root
+        TotalWeight ~~ LeafWeight'
+
+fit_PCA = cfa(model = mPCA, data = dat_fit_PCA, group = "block")
+
+summary(fit_PCA)
+```
+
+```{r predict_PCA, echo=FALSE}
+lat_data = predict(fit_PCA, dat_fit_PCA) #to get the latent values for each individuals
+
+dat_lat1 = lat_data$C
+dat_lat1 = data.frame(block = "C", dat_lat1)
+
+dat_lat2 = lat_data$D
+dat_lat2 = data.frame(block = "D", dat_lat2)
+
+a = bind_rows(dat_lat1, dat_lat2)
+
+dat_ordered = arrange(dat_choose, block)
+b = bind_cols(dat_ordered,a)[,-7]
+
+```
+
+```{r root_shoot_plot_PCA, echo=FALSE, warning=FALSE}
+fit_root_shoot_C = lm(data = filter(b, block == "C"), shoot ~ root)
+fit_root_shoot_D = lm(data = filter(b, block == "D"), shoot ~ root)
+
+x <- list(title = "Root")
+y <- list(title = "Shoot")
+plot_ly(b, x= ~root, y= ~shoot, color = ~block, type = "scatter", mode = "markers") %>%
+  layout(title = "Shoot(Root) and linear regressions for each group", xaxis = x, yaxis = y) %>%
+  add_lines(data = filter(b, block == "C"), y = fitted(fit_root_shoot_C), text = paste("shoot =", round(fit_root_shoot_C$coefficients[2], 3), "* root"), hoverinfo = "text") %>%
+  add_lines(data = filter(b, block == "D"), y = fitted(fit_root_shoot_D), text = paste("shoot =", round(fit_root_shoot_D$coefficients[2], 3), "* root"), hoverinfo = "text")
+
+print(paste("Correlation between fit and value for group C:",round(cor(b$shoot[which(b$block=="C")],fitted(fit_root_shoot_C)),3)))
+print(paste("Correlation between fit and value for group D:",round(cor(b$shoot[which(b$block=="D")],fitted(fit_root_shoot_D)),3)))
+```
+
+## PCA on Root and Shoot variables
+
+When Comp1 and Comp2 (and Comp4 and Comp5) are not both in the model, no error (but still p-value = 0 -> strange)
+
+```{r PCA2}
+PCA_shoot = PCA(dat_complete, scale.unit=TRUE, ncp=5, graph=F, quali.sup = 1, quanti.sup = c(5:24))
+PCA_shoot_coord = PCA_shoot[["var"]][["coord"]]
+dat_PCA_shoot = data.frame(as.matrix.data.frame(dat_complete[,-c(1,5:24)]) %*% as.matrix.data.frame(PCA_shoot_coord))
+
+dat_PCA_with_block2 = data.frame(block = dat_complete[,1], dat_PCA_shoot, dat_PCA_root)
+dat_fit_PCA2 = mutate_if(dat_PCA_with_block2, is.numeric, scale)
+
+names(dat_fit_PCA2) = c("block","CompS1","CompS2","CompS3","CompR1","CompR2","CompR3","CompR4","CompR5")
+
+mPCA2 = 'root =~ CompR1 + CompR3
+        shoot =~ CompS1 + CompS2
+        shoot ~ root'
+
+fit_PCA2 = cfa(model = mPCA2, data = dat_fit_PCA2, group = "block")
+
+summary(fit_PCA2)
+```
+
+```{r predict_PCA2, echo=FALSE}
+lat_data = predict(fit_PCA2, dat_fit_PCA2) #to get the latent values for each individuals
+
+dat_lat1 = lat_data$C
+dat_lat1 = data.frame(block = "C", dat_lat1)
+
+dat_lat2 = lat_data$D
+dat_lat2 = data.frame(block = "D", dat_lat2)
+
+a = bind_rows(dat_lat1, dat_lat2)
+
+dat_ordered = arrange(dat_choose, block)
+b = bind_cols(dat_ordered,a)[,-7]
+
+```
+
+```{r root_shoot_plot_PCA2, echo=FALSE, warning=FALSE}
+fit_root_shoot_C = lm(data = filter(b, block == "C"), shoot ~ root)
+fit_root_shoot_D = lm(data = filter(b, block == "D"), shoot ~ root)
+
+x <- list(title = "Root")
+y <- list(title = "Shoot")
+plot_ly(b, x= ~root, y= ~shoot, color = ~block, type = "scatter", mode = "markers") %>%
+  layout(title = "Shoot(Root) and linear regressions for each group", xaxis = x, yaxis = y) %>%
+  add_lines(data = filter(b, block == "C"), y = fitted(fit_root_shoot_C), text = paste("shoot =", round(fit_root_shoot_C$coefficients[2], 3), "* root"), hoverinfo = "text") %>%
+  add_lines(data = filter(b, block == "D"), y = fitted(fit_root_shoot_D), text = paste("shoot =", round(fit_root_shoot_D$coefficients[2], 3), "* root"), hoverinfo = "text")
+
+print(paste("Correlation between fit and value for group C:",round(cor(b$shoot[which(b$block=="C")],fitted(fit_root_shoot_C)),3)))
+print(paste("Correlation between fit and value for group D:",round(cor(b$shoot[which(b$block=="D")],fitted(fit_root_shoot_D)),3)))
+```
+
+
+## PCA on Root and Ionomics variables
+
+### Fitting and summary of the model
+
+When Comp1 and Comp2 (and Comp4 and Comp5) are not both in the model, no error (but still p-value = 0 -> strange)
+
+```{r loading_data_iono, message=FALSE, warning=FALSE}
+# dat ion ICP = data only for one individual per variety
+# dat_ionICP = read.csv("2017_Tottori_May_IonomeICP.csv")
+dat_ionX = read.csv("2017_Tottori_May_IonomeXray.csv")
+
+dat_shoot$year = 2017
+dat_join = inner_join(dat_shoot, dat_root, by = colnames(dat_root)[1:9])
+weightProblem = filter(dat_join,LeafWeight_g > TotalWeight_g)
+dat_join = anti_join(dat_join, weightProblem)
+dat_IandP = inner_join(dat_join, dat_ionX, by = colnames(dat_join)[1:9])
+dat_IandP$block = as.factor(dat_IandP$block)
+dat_IandP$ID = 1:nrow(dat_IandP)
+
+dat_IandP = dat_IandP[,-(c(1:6,8,9))]
+
+dat_complete2 = dat_IandP[complete.cases(dat_IandP),]
+
+
+```
+
+```{r PCA3}
+PCA_iono = PCA(dat_complete2, scale.unit=TRUE, ncp=5, graph=F, quali.sup = 1, quanti.sup = c(2:24))
+PCA_iono_coord = PCA_iono[["var"]][["coord"]]
+dat_PCA_iono = data.frame(as.matrix.data.frame(dat_complete2[,-c(1,1:24)]) %*% as.matrix.data.frame(PCA_iono_coord))
+
+PCA_root2 = PCA(dat_complete2, scale.unit=TRUE, ncp=5, graph=F, quali.sup = 1, quanti.sup = c(2:4,25:43))
+PCA_root_coord2 = PCA_root2[["var"]][["coord"]]
+dat_PCA_root2 = data.frame(as.matrix.data.frame(dat_complete2[,-c(1:4,25:43)]) %*% as.matrix.data.frame(PCA_root_coord2))
+
+dat_PCA_with_block3 = data.frame(dat_complete2[,c(1:4)], dat_PCA_root2, dat_PCA_iono)
+dat_fit_PCA3 = mutate_if(dat_PCA_with_block3, is.numeric, scale)
+
+names(dat_fit_PCA3) = c("block","PlantHeight","LeafWeight","TotalWeight","CompR1","CompR2","CompR3","CompR4","CompR5","CompI1","CompI2","CompI3","CompI4","CompI5")
+
+mPCA3 = 'root =~ CompR1 + CompR3
+        shoot =~ LeafWeight + PlantHeight + TotalWeight
+        iono =~ CompI1  + CompI3 + CompI4 + CompI5
+        shoot ~ root + iono
+        TotalWeight ~~ LeafWeight'
+
+fit_PCA3 = cfa(model = mPCA3, data = dat_fit_PCA3, group = "block")
+
+summary(fit_PCA3)
+```
+
+***
+
+### Graph of Shoot/Root and Shoot/Ionomics
+
+```{r predict_PCA3, echo=FALSE, warning=FALSE}
+lat_data = predict(fit_PCA3, dat_fit_PCA3) #to get the latent values for each individuals
+
+dat_lat1 = lat_data$C
+dat_lat1 = data.frame(block = "C", dat_lat1)
+
+dat_lat2 = lat_data$D
+dat_lat2 = data.frame(block = "D", dat_lat2)
+
+a = bind_rows(dat_lat1, dat_lat2)
+
+dat_choose2 = dat_complete2[,c(1:5,9)]
+dat_ordered2 = arrange(dat_choose2, block)
+b = bind_cols(dat_ordered2,a)[,-7]
+
+```
+
+```{r root_shoot_plot_PCA3, echo=FALSE, warning=FALSE}
+fit_root_shoot_C = lm(data = filter(b, block == "C"), shoot ~ root + iono)
+fit_root_shoot_D = lm(data = filter(b, block == "D"), shoot ~ root + iono)
+
+x <- list(title = "Root")
+y <- list(title = "Shoot")
+plot_ly(b, x= ~root, y= ~shoot, color = ~block, type = "scatter", mode = "markers") %>%
+  layout(title = "Shoot(Root) and linear regressions for each group", xaxis = x, yaxis = y) %>%
+  add_lines(data = filter(b, block == "C"), y = fitted(fit_root_shoot_C), text = paste("shoot =", round(fit_root_shoot_C$coefficients[2], 3), "* root"), hoverinfo = "text") %>%
+  add_lines(data = filter(b, block == "D"), y = fitted(fit_root_shoot_D), text = paste("shoot =", round(fit_root_shoot_D$coefficients[2], 3), "* root"), hoverinfo = "text")
+
+print(paste("Correlation between fit and value for group C:",round(cor(b$shoot[which(b$block=="C")],fitted(fit_root_shoot_C)),3)))
+print(paste("Correlation between fit and value for group D:",round(cor(b$shoot[which(b$block=="D")],fitted(fit_root_shoot_D)),3)))
+```
+
+
+```{r iono_shoot_plot_PCA3, echo=FALSE, warning=FALSE}
+fit_root_shoot_C = lm(data = filter(b, block == "C"), shoot ~ root + iono)
+fit_root_shoot_D = lm(data = filter(b, block == "D"), shoot ~ root + iono)
+
+x <- list(title = "Iono")
+y <- list(title = "Shoot")
+plot_ly(b, x= ~iono, y= ~shoot, color = ~block, type = "scatter", mode = "markers") %>%
+  layout(title = "Shoot(Root) and linear regressions for each group", xaxis = x, yaxis = y) %>%
+  add_lines(data = filter(b, block == "C"), y = fitted(fit_root_shoot_C), text = paste("shoot =", round(fit_root_shoot_C$coefficients[2], 3), "* iono"), hoverinfo = "text") %>%
+  add_lines(data = filter(b, block == "D"), y = fitted(fit_root_shoot_D), text = paste("shoot =", round(fit_root_shoot_D$coefficients[2], 3), "* iono"), hoverinfo = "text")
+
+print(paste("Correlation between fit and value for group C:",round(cor(b$shoot[which(b$block=="C")],fitted(fit_root_shoot_C)),3)))
+print(paste("Correlation between fit and value for group D:",round(cor(b$shoot[which(b$block=="D")],fitted(fit_root_shoot_D)),3)))
+```
+
+
+***
+
+### Shoot (latent variable) Statistics
+
+
+```{r Shoot2, echo=FALSE}
+tapply(b[,7], b$block, summary)
+plot_ly(b, x = ~block, y= ~shoot, type = "box")
+```
+
+***
+
+### Root (latent variable) Statistics
+
+
+```{r Root2, echo=FALSE}
+tapply(b[,8], b$block, summary)
+plot_ly(b, x = ~block, y= ~root, type = "box")
+```
+
+***
 
 # Appendix
 ```{r sessionInfo}
