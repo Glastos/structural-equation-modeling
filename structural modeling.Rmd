@@ -55,6 +55,8 @@ suppressPackageStartupMessages({
   require(lavaanPlot)
   require(plotly)
   require(FactoMineR)
+  require(data.table)
+  require(rrBLUP)
 })
 
 #  R options
@@ -378,25 +380,41 @@ dat_ionX = read.csv("2017_Tottori_May_IonomeXray.csv")
 
 dat_shoot$year = 2017
 dat_join = inner_join(dat_shoot, dat_root, by = colnames(dat_root)[1:9])
+dat_join$ID = 1:nrow(dat_join)
+
 weightProblem = filter(dat_join,LeafWeight_g > TotalWeight_g)
 dat_join = anti_join(dat_join, weightProblem)
-dat_IandP = inner_join(dat_join, dat_ionX, by = colnames(dat_join)[1:9])
+
+dat_IandP = inner_join(dat_join, dat_ionX, by = colnames(dat_join)[2:9])[,-33]
 dat_IandP$block = as.factor(dat_IandP$block)
-dat_IandP$ID = 1:nrow(dat_IandP)
+
+name_IandP = dat_IandP[complete.cases(dat_IandP),1]
 
 dat_IandP = dat_IandP[,-(c(1:6,8,9))]
-
 dat_complete2 = dat_IandP[complete.cases(dat_IandP),]
-
 
 ```
 
 ```{r PCA3}
+
 PCA_iono = PCA(dat_complete2, scale.unit=TRUE, ncp=5, graph=F, quali.sup = 1, quanti.sup = c(2:24))
+# 
+# dat_complete2_iono = dat_complete2[,-c(1:24)]
+# dat_test = prep(dat_complete2_iono, scale = "uv", center = T)
+# PCA_iono = pca(dat_test, method = "ppca", nPcs = 5)
+# c= as.data.frame(loadings(PCA_iono))
+
+
 PCA_iono_coord = PCA_iono[["var"]][["coord"]]
 dat_PCA_iono = data.frame(as.matrix.data.frame(dat_complete2[,-c(1,1:24)]) %*% as.matrix.data.frame(PCA_iono_coord))
 
 PCA_root2 = PCA(dat_complete2, scale.unit=TRUE, ncp=5, graph=F, quali.sup = 1, quanti.sup = c(2:4,25:43))
+
+# dat_complete2_root = dat_complete2[,-c(1:4,25:43)]
+# dat_test2 = prep(dat_complete2_root, scale = "uv", center = T)
+# PCA_root2 = pca(dat_test2, method = "ppca", nPcs = 5)
+# c= as.data.frame(loadings(PCA_root2))
+
 PCA_root_coord2 = PCA_root2[["var"]][["coord"]]
 dat_PCA_root2 = data.frame(as.matrix.data.frame(dat_complete2[,-c(1:4,25:43)]) %*% as.matrix.data.frame(PCA_root_coord2))
 
@@ -477,6 +495,7 @@ print(paste("Correlation between fit and value for group D:",round(cor(b$shoot[w
 ```{r Shoot2, echo=FALSE}
 tapply(b[,7], b$block, summary)
 plot_ly(b, x = ~block, y= ~shoot, type = "box")
+
 ```
 
 ***
@@ -490,6 +509,64 @@ plot_ly(b, x = ~block, y= ~root, type = "box")
 ```
 
 ***
+
+# BLUP
+
+
+```{r}
+geno = fread("E:/SoyBeanData/Genotype/G_score.csv")
+
+head(geno)[100000:100010,1:10]
+
+#Selecting only the relevant genotype
+varieties_geno = names(geno)[-1]
+varieties_pheno = unique(dat_ionX[dat_lat$ID,"variety"])
+varieties = intersect(varieties_geno, varieties_pheno)
+geno1 = select(geno, all_of(varieties))
+geno1 = t(geno)
+#Keeping only the phenotype with existing genotype
+dat_lat_existing = dat_lat[dat_lat$variety %in% varieties,]
+
+
+#Trouver un moyen de faire correspondre les genomes aux pheno sans en mettre plusieurs pour la meme variete ?
+
+y <- dat_lat_existing[,4]
+X <- as.matrix(geno1)
+K <- crossprod(X)/ncol(X)
+
+
+# GBLUP
+eigenK <- eigen(K)
+model <- lmm.diago(Y = y, eigenK = eigenK)
+```
+
+
+```{r}
+# estimate a (marker effects) from u (breeding values)
+
+solveK <- eigenK$vectors %*% diag(1/eigenK$values) %*% t(eigenK$vectors)
+a <- t(X) %*% solveK %*% model$BLUP_omega / ncol(X)
+a <- a[,1]
+# names(a) <- paste("M", bm.wp@snps$chr, ".", bm.wp@snps$pos, sep = "")
+
+
+# check the effect
+
+y.fit.Xa <- model$Xbeta + X %*% a
+y.fit.u <- model$Xbeta + model$BLUP_omega
+plot(y, y.fit.Xa)
+abline(0, 1, col = "red")
+```
+
+
+```{r}
+plot(y.fit.Xa, y.fit.u)
+abline(0, 1, col = "red")
+```
+
+
+
+
 
 # Appendix
 ```{r sessionInfo}

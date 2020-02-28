@@ -1,0 +1,279 @@
+---
+title: "Structural modeling"
+author: "Guilhem Huau"
+date: "`r format(Sys.time(), '%d/%m/%Y %H:%M:%S')`"
+colorlinks: true
+output:
+  html_document:
+    toc: true
+    toc_depth: 4
+    toc_float: true
+    number_sections: TRUE
+  pdf_document:
+    toc: true
+    toc_depth: 4
+    number_sections: TRUE
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      eval = TRUE,
+                      include = TRUE,
+                      warning = TRUE,
+                      message = TRUE,
+                      
+                      cache = FALSE, # save chunks output 
+                      
+                      results = "hold", # display chunk output in one block
+                      
+                      tidy = FALSE, # better code organisation
+                      tidy.opts = list(width.cutoff = 80),
+                      strip.white = TRUE, #remove the white lines in the beginning or end of a source chunk
+                      
+                      fig.align = "center",
+                      fig.width = 9,
+                      fig.height = 5)
+
+knitr::opts_knit$set(progress = TRUE,
+                     verbose = FALSE,
+                     width = 80)
+
+```
+
+```{css echo=FALSE, eval = TRUE}
+/* add some CSS styling here */
+```
+
+**Packages / R-options:**
+```{r pkgs_options}
+suppressPackageStartupMessages({
+  require(dplyr)
+  require(tibble)
+  require(tidyr)
+  require(magrittr)
+  require(lavaan)
+  # require(lavaanPlot)
+  # require(plotly)
+  require(FactoMineR)
+  require(data.table)
+  require(rrBLUP)
+  require(gaston)
+})
+
+#  R options
+options(stringsAsFactors = FALSE)
+
+```
+
+***
+
+```{r loading_data, include=FALSE}
+dat_root = read.csv("2017_Tottori_May_RootPhenotype.csv")
+dat_shoot = read.csv("2017_Tottori_May_ShootPhenotype.csv")
+dat_shoot$year = 2017
+dat_join = inner_join(dat_shoot, dat_root, by = colnames(dat_root)[1:9])
+dat_join$ID = 1:nrow(dat_join)
+dat_join$block = as.factor(dat_join$block)
+weightProblem = filter(dat_join,LeafWeight_g > TotalWeight_g)
+dat_join = anti_join(dat_join, weightProblem)
+
+```
+
+
+```{r loading_data_iono, message=FALSE, warning=FALSE}
+
+dat_ionX = read.csv("2017_Tottori_May_IonomeXray.csv")
+
+dat_ionX = arrange(dat_ionX, varietyID)
+dat_ionX$ID = 1:nrow(dat_ionX)
+
+dat_join = arrange(dat_join, varietyID)
+
+dat_IandP = inner_join(dat_join, dat_ionX, by = colnames(dat_join)[1:9])
+dat_IandP$block = as.factor(dat_IandP$block)
+name_IandP = dat_IandP[complete.cases(dat_IandP),c(1,6,7)]
+
+dat_complete = dat_IandP[complete.cases(dat_IandP),-c(2:5,8,9)]
+
+```
+
+```{r PCA3}
+
+PCA_iono = PCA(dat_complete, scale.unit=TRUE, ncp=5, graph=F, quali.sup = c(1,2,3), quanti.sup = c(4:26))
+
+
+PCA_iono_coord = PCA_iono[["var"]][["coord"]]
+dat_PCA_iono = data.frame(as.matrix.data.frame(dat_complete[,-c(1:26)]) %*% as.matrix.data.frame(PCA_iono_coord))
+
+PCA_root2 = PCA(dat_complete, scale.unit=TRUE, ncp=5, graph=F, quali.sup = c(1,2,3), quanti.sup = c(4:6,27:45))
+
+
+PCA_root_coord2 = PCA_root2[["var"]][["coord"]]
+dat_PCA_root2 = data.frame(as.matrix.data.frame(dat_complete[,-c(1:6,27:45)]) %*% as.matrix.data.frame(PCA_root_coord2))
+
+dat_PCA_with_block3 = data.frame(dat_complete[,c(1:6)], dat_PCA_root2, dat_PCA_iono)
+dat_fit_PCA3 = mutate_if(dat_PCA_with_block3, is.numeric, scale)
+
+names(dat_fit_PCA3) = c("ID","variety","block","PlantHeight","LeafWeight","TotalWeight","CompR1","CompR2","CompR3","CompR4","CompR5","CompI1","CompI2","CompI3","CompI4","CompI5")
+
+mPCA3 = 'root =~ CompR1 + CompR3
+        shoot =~ LeafWeight + PlantHeight + TotalWeight
+        iono =~ CompI1  + CompI3 + CompI4 + CompI5
+        shoot ~ root + iono
+        TotalWeight ~~ LeafWeight'
+
+fit_PCA3 = cfa(model = mPCA3, data = dat_fit_PCA3, group = "block")
+
+# summary(fit_PCA3)
+```
+
+***
+
+### Graph of Shoot/Root and Shoot/Ionomics
+
+```{r predict_PCA3, echo=FALSE, warning=FALSE}
+dat_lat = predict(fit_PCA3, dat_fit_PCA3) #to get the latent values for each individuals
+
+dat_lat1 = dat_lat$C
+dat_lat1 = data.frame(name_IandP[name_IandP$block == "C",], dat_lat1)
+
+dat_lat2 = dat_lat$D
+dat_lat2 = data.frame(name_IandP[name_IandP$block == "D",], dat_lat2)
+
+dat_lat = bind_rows(dat_lat1, dat_lat2)%>%
+  arrange(ID)
+
+```
+
+***
+
+# BLUP
+
+
+```{r load_geno}
+if (Sys.info()["user"]== "guilh" ) {
+  f <- "E:/SoyBeanData/Genotype/G_score.csv"
+} else {
+    f <- "G_score.csv"
+
+}
+geno = fread(f)
+```
+
+```{r geno_matrix_calculation}
+geno1 = geno
+head(geno1)[,1:10]
+SNP = geno1[,1]
+
+#Selecting only the relevant genotype
+varieties_geno = names(geno1)[-1]
+varieties_pheno = unique(dat_ionX[dat_lat$ID,"variety"])
+varieties = intersect(varieties_geno, varieties_pheno)
+geno1 = select(geno1, all_of(varieties))
+
+#Keeping only the phenotype with existing genotype
+dat_lat_existing = dat_lat[dat_lat$variety %in% varieties,]
+dat_lat_mean = dat_lat_existing %>% 
+  group_by(variety) %>%
+  summarise_at(vars(root:iono), mean)
+
+#Trouver un moyen de faire correspondre les genomes aux pheno sans en mettre plusieurs pour la meme variete ?
+
+X = t(as.matrix(geno1) + 1)
+K = tcrossprod(X)/ncol(X)
+
+# GBLUP
+eigenK = eigen(K)
+saveRDS(eigenK, "eigenK.rds")
+```
+
+```{r root}
+y = pull(dat_lat_mean,root)
+
+
+model = lmm.diago(Y = y, eigenK = eigenK)
+saveRDS(model, file = "model_root.rds")
+
+# estimate a (marker effects) from u (breeding values)
+
+solveK = eigenK$vectors %*% diag(1/eigenK$values) %*% t(eigenK$vectors)
+a = t(X) %*% solveK %*% model$BLUP_omega / ncol(X)
+a = a[,1]
+write.csv(a, "marker_effects_root.csv")
+# names(a) = paste("M", bm.wp@snps$chr, ".", bm.wp@snps$pos, sep = "")
+
+
+# check the effect
+
+y.fit.Xa = model$Xbeta + X %*% a
+y.fit.u = model$Xbeta + model$BLUP_omega
+
+plot(y, y.fit.Xa)
+abline(0, 1, col = "red")
+plot(y.fit.Xa, y.fit.u)
+abline(0, 1, col = "red")
+```
+
+
+```{r shoot}
+y = pull(dat_lat_mean,shoot)
+
+
+model = lmm.diago(Y = y, eigenK = eigenK)
+saveRDS(model, file = "model_shoot.rds")
+
+# estimate a (marker effects) from u (breeding values)
+
+solveK = eigenK$vectors %*% diag(1/eigenK$values) %*% t(eigenK$vectors)
+a = t(X) %*% solveK %*% model$BLUP_omega / ncol(X)
+a = a[,1]
+write.csv(a, "marker_effects_shoot.csv")
+# names(a) = paste("M", bm.wp@snps$chr, ".", bm.wp@snps$pos, sep = "")
+
+
+# check the effect
+
+y.fit.Xa = model$Xbeta + X %*% a
+y.fit.u = model$Xbeta + model$BLUP_omega
+
+plot(y, y.fit.Xa)
+abline(0, 1, col = "red")
+plot(y.fit.Xa, y.fit.u)
+abline(0, 1, col = "red")
+```
+
+
+```{r iono}
+y = pull(dat_lat_mean,iono)
+
+
+model = lmm.diago(Y = y, eigenK = eigenK)
+saveRDS(model, file = "model_iono.rds")
+
+# estimate a (marker effects) from u (breeding values)
+
+solveK = eigenK$vectors %*% diag(1/eigenK$values) %*% t(eigenK$vectors)
+a = t(X) %*% solveK %*% model$BLUP_omega / ncol(X)
+a = a[,1]
+write.csv(a, "marker_effects_iono.csv")
+# names(a) = paste("M", bm.wp@snps$chr, ".", bm.wp@snps$pos, sep = "")
+
+
+# check the effect
+
+y.fit.Xa = model$Xbeta + X %*% a
+y.fit.u = model$Xbeta + model$BLUP_omega
+
+plot(y, y.fit.Xa)
+abline(0, 1, col = "red")
+plot(y.fit.Xa, y.fit.u)
+abline(0, 1, col = "red")
+```
+
+
+
+
+# Appendix
+```{r sessionInfo}
+print(sessionInfo(), locale = FALSE)
+```
